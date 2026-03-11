@@ -50,8 +50,7 @@ go test -v -run TestElectionDisconnectLoop ./...
 ### 4. 使用 dotest.sh 并生成日志可视化
 
 ```bash
-# 运行指定测试，输出保存到 ~/temp/rlog，并生成 HTML 可视化
-mkdir -p ~/temp   # 若目录不存在需先创建
+# 运行指定测试，rlog 和 HTML 可视化文件输出到 /Users/shentang/temp/（目录不存在时会自动创建）
 
 ./dotest.sh TestElectionBasic
 ./dotest.sh TestElectionLeaderDisconnect
@@ -63,7 +62,7 @@ mkdir -p ~/temp   # 若目录不存在需先创建
 ./dotest.sh TestElectionDisconnectLoop
 ```
 
-然后打开生成的 HTML 文件（路径会打印在终端，如 `file:///tmp/TestElectionBasic.html`），可在浏览器中查看各节点的日志时间线。
+然后打开生成的 HTML 文件（路径会打印在终端，如 `file:///Users/shentang/temp/TestElectionBasic.html`），可在浏览器中查看各节点的日志时间线。
 
 ### 5. 代码静态检查
 

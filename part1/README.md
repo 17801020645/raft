@@ -71,26 +71,77 @@ mkdir -p ~/temp   # 若目录不存在需先创建
 ./dochecks.sh
 ```
 
-会执行 `go vet` 和 `staticcheck`。
+脚本会依次执行 `go vet` 和 `staticcheck`，对 `./...` 下所有包做静态分析。
+
+| 工具 | 作用 |
+|------|------|
+| **go vet** | Go 内置静态分析器。检查常见错误：不可达代码、可疑 struct tag、格式化字符串参数不匹配、错误的 `printf` 占位符、`copy`/`append` 参数错误等。 |
+| **staticcheck** | 第三方静态分析器，规则更丰富。检查未使用的变量/导入、可简化的逻辑、潜在的 nil 解引用、goroutine 泄漏风险、错误的 `sync` 用法等。 |
+
+**静态检查主要解决什么问题？**
+
+- **在运行前发现潜在 bug**：测试覆盖不到的逻辑分支、边界条件、并发问题等。
+- **提升代码质量**：消除死代码、简化冗余逻辑、统一风格。
+- **避免隐蔽错误**：如格式化字符串与参数类型不匹配、锁使用不当等，编译能通过但运行时会出错或产生难以排查的 bug。
 
 ## 环境变量（可选）
 
-| 变量 | 作用 |
-|------|------|
-| `RAFT_FORCE_MORE_REELECTION` | 任意非空值时，约 1/3 概率使用固定短超时，增加重新选举，用于压力测试 |
-| `RAFT_UNRELIABLE_RPC` | 任意非空值时，RPC 可能被丢弃或延迟，模拟不可靠网络 |
+part1 支持以下环境变量，用于压力测试和模拟异常网络。**未设置时使用默认行为**。
 
-示例：
+| 变量 | 作用 | 默认行为 |
+|------|------|----------|
+| `RAFT_FORCE_MORE_REELECTION` | 约 1/3 概率将选举超时固定为 150ms（否则为 150–300ms 随机），使多节点同时超时，增加选举冲突和重新选举次数 | 选举超时在 150–300ms 间随机 |
+| `RAFT_UNRELIABLE_RPC` | 对 RequestVote 和 AppendEntries：约 10% 概率丢弃 RPC，约 10% 概率延迟 75ms，其余正常（1–5ms 小延迟） | 每次 RPC 仅 1–5ms 小延迟 |
+
+### 用法示例
 
 ```bash
+# 模拟不可靠网络，验证领导者断开场景
 RAFT_UNRELIABLE_RPC=1 go test -v -run TestElectionLeaderDisconnect ./...
+
+# 强制更多重新选举，压力测试选举稳定性
+RAFT_FORCE_MORE_REELECTION=1 go test -v -run TestElectionDisconnectLoop ./...
+
+# 同时启用：不可靠网络 + 频繁重新选举
+RAFT_UNRELIABLE_RPC=1 RAFT_FORCE_MORE_REELECTION=1 go test -v -run TestElectionLeaderAndAnotherDisconnect ./...
+
+# 配合 dotest.sh 使用
+RAFT_UNRELIABLE_RPC=1 ./dotest.sh TestElectionFollowerComesBack
 ```
 
 ## 核心概念
 
-- **ConsensusModule (CM)**：单节点 Raft 共识模块，维护 term、votedFor、log 等状态
-- **Server**：包装 CM，提供 TCP RPC 服务，管理与其他节点的连接
-- **Harness**：测试用集群管理，支持断开/重连节点以模拟网络分区
+### ConsensusModule (CM)
+
+Raft 的**共识状态机**，对应集群中的一个节点。每个 CM 有唯一 `id`，维护：
+
+- **持久状态**：`currentTerm`（当前任期）、`votedFor`（本任期投票对象）、`log`（复制日志）
+- **易失状态**：`state`（Follower/Candidate/Leader/Dead）、`electionResetEvent`（选举超时计时起点）
+
+CM 负责选举逻辑：超时后发起选举、向其他节点发送 RequestVote、收到多数票后成为 Leader、定期发送 AppendEntries 心跳。它通过持有的 `*Server` 发起 RPC，不关心网络细节。
+
+### Server
+
+**网络层封装**，把 CM 暴露为可远程调用的 RPC 服务，并管理与其他节点的连接：
+
+- 在随机端口上监听 TCP，将 `RequestVote` 和 `AppendEntries` 注册为 RPC 方法
+- 维护 `peerClients`：到其他 Server 的 RPC 客户端连接
+- 提供 `ConnectToPeer` / `DisconnectPeer`，用于建立或断开与某节点的连接
+
+CM 调用 `server.Call(peerId, "ConsensusModule.RequestVote", ...)` 时，由 Server 通过对应 `peerClients` 发送 RPC。测试中通过断开连接来模拟网络分区。
+
+### Harness
+
+**测试辅助结构**，用于搭建和管理 Raft 集群：
+
+- `NewHarness(t, n)`：创建 n 个 Server，互相连接，并关闭 `ready` 通道以启动选举
+- `DisconnectPeer(id)`：断开节点 id 与所有其他节点的连接，模拟该节点被分区
+- `ReconnectPeer(id)`：恢复节点 id 的连接
+- `CheckSingleLeader()`：断言当前 exactly one 节点认为自己是 Leader
+- `CheckNoLeader()`：断言当前没有节点认为自己是 Leader
+- `Shutdown()`：关闭所有 Server，清理资源
+
+测试通过 Disconnect/Reconnect 模拟网络故障，并用 Check 方法验证选举结果是否符合预期。
 
 ## 测试用例说明
 

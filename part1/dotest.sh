@@ -1,8 +1,10 @@
 #!/bin/bash
 set -ex
 
-logfile=~/temp/rlog
+logdir=~/temp
+logfile=${logdir}/rlog
+mkdir -p "${logdir}"
 
-go test -v -race -run $@ |& tee ${logfile}
+go test -v -race -run "$@" 2>&1 | tee "${logfile}"
 
-go run ../tools/raft-testlog-viz/main.go < ${logfile}
+go run ../tools/raft-testlog-viz/main.go < "${logfile}"

@@ -63,7 +63,7 @@ mkdir -p ~/temp   # 若目录不存在需先创建
 ./dotest.sh TestElectionDisconnectLoop
 ```
 
-然后打开生成的 HTML 文件（路径会打印在终端），可在浏览器中查看各节点的日志时间线。
+然后打开生成的 HTML 文件（路径会打印在终端，如 `file:///tmp/TestElectionBasic.html`），可在浏览器中查看各节点的日志时间线。
 
 ### 5. 代码静态检查
 
@@ -182,4 +182,4 @@ CM 调用 `server.Call(peerId, "ConsensusModule.RequestVote", ...)` 时，由 Se
 
 - 结构清晰，符合 Raft 论文（Figure 2）的选举逻辑。
 - 使用 `sync.Mutex` 保护并发访问，RPC 通过 `RPCProxy` 支持延迟和丢包模拟。
-- `dochecks.sh` 可做静态检查，需安装 `staticcheck`：`go install honnef.co/go/tools/cmd/staticcheck@latest`。
+- `dochecks.sh` 使用 `go run` 调用 staticcheck，无需单独安装。

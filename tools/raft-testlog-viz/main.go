@@ -10,6 +10,7 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -278,6 +279,9 @@ func parseTestLogs(rd io.Reader) []TestLog {
 }
 
 func main() {
+	outputDir := flag.String("output", "/tmp", "output directory for HTML files")
+	flag.Parse()
+
 	testlogs := parseTestLogs(os.Stdin)
 
 	tnames := make(map[string]int)
@@ -299,7 +303,7 @@ func main() {
 		if tl.status != "PASS" {
 			statusSummary = tl.status
 		}
-		emitTestViz("/tmp", tl)
+		emitTestViz(*outputDir, tl)
 		fmt.Println("")
 	}
 

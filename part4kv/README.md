@@ -70,10 +70,25 @@ go test -v -run TestCrashThenRestartLeader ./...
 ```bash
 # 在 part4kv 目录下运行，rlog 和 HTML 输出到 /Users/shentang/temp/
 
+# 基础功能
+./dotest.sh TestSetupHarness
+./dotest.sh TestClientRequestBeforeConsensus
 ./dotest.sh TestBasicPutGetSingleClient
+./dotest.sh TestPutPrevValue
+./dotest.sh TestBasicPutGetDifferentClients
+./dotest.sh TestCASBasic
+./dotest.sh TestCASConcurrent
+
+# 并发与多客户端
+./dotest.sh TestConcurrentClientsPutsAndGets
+./dotest.sh Test5ServerConcurrentClientsPutsAndGets
+
+# 网络故障与崩溃恢复
 ./dotest.sh TestDisconnectLeaderAfterPuts
+./dotest.sh TestDisconnectLeaderAndFollower
+./dotest.sh TestCrashFollower
+./dotest.sh TestCrashLeader
 ./dotest.sh TestCrashThenRestartLeader
-# ... 其他测试
 ```
 
 然后打开生成的 HTML 文件（路径会打印在终端），可在浏览器中查看日志时间线。
